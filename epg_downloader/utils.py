@@ -44,11 +44,8 @@ def get_entries(data):
     for entry in data['recorded']:
         filename = unquote_plus(entry['filename'])
         if not entry['recording']:
-            yield {
-                'description': entry['description'],
-                'filename': filename,
-                'name': entry['name'],
-                'epg_url': get_epg_url(entry['id']),
-            }
+            entry['filename'] = filename
+            entry['epg_url'] = get_epg_url(entry['id']),
+            yield entry
         else:
             log.warn(f'Skipping {filename}')

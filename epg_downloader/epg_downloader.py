@@ -26,3 +26,11 @@ def download_from_epg(**kwargs):
         download_file(entry['epg_url'], filename)
         with open(json_filename, 'w') as fp:
             json.dump(entry, fp, indent=True, ensure_ascii=False)
+
+
+def upload_to_s3(**kwargs):
+    pass
+
+
+def initialize(path):
+    pass

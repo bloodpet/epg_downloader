@@ -1,4 +1,5 @@
 from environs import Env
+from peewee import Model, SqliteDatabase
 import os
 
 env = Env()
@@ -16,3 +17,12 @@ class settings:
         'https://{}.digitaloceanspaces.com'.format(AWS_REGION_NAME),
     )
     DIRECTORY = env('DIRECTORY', default=env('PWD'))
+    DATABASE_PATH = env('DATABASE_PATH', default=f'{DIRECTORY}/epg_downloader.db')
+
+
+database = SqliteDatabase(settings.DATABASE_PATH)
+
+
+class Recordings(Model):
+    class Meta:
+        database = database
