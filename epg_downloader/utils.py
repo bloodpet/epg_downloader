@@ -47,7 +47,7 @@ def get_entries(data):
         if not entry['recording']:
             entry['epg_key'] = get_local_key(entry_id)
             entry['filename'] = filename
-            entry['epg_url'] = get_epg_url(entry_id),
+            entry['epg_url'] = get_epg_url(entry_id)
             yield entry
         else:
             log.warn(f'Skipping {filename}')
