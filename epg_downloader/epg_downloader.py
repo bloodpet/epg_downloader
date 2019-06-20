@@ -22,7 +22,7 @@ def download_from_epg(**kwargs):
         filename = entry['filename']
         json_filename = f'{filename}.json'
         entry['json_file'] = json_filename
-        epg_key = get_local_key(entry)
+        epg_key = get_local_key(entry['id'])
         if epg_key in kv_store.keys():
             log.info(f'Skipping download of {filename}')
             continue
@@ -43,7 +43,7 @@ def download_from_epg(**kwargs):
 def upload_to_s3(**kwargs):
     s3 = S3()
     for entry in kv_store[kv_store.key.startswith('epg')]:
-        epg_key = get_local_key(entry)
+        epg_key = get_local_key(entry['id'])
         filename = entry['filename']
         if entry['epg_status'] != 'downloaded':
             log.info(f'Skipping upload of {filename}')
