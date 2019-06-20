@@ -5,7 +5,7 @@ import sys
 import click
 
 from .app import settings
-from .epg_downloader import download_from_epg
+from .epg_downloader import download_from_epg, upload_to_s3
 
 
 class EPGConfig(object):
@@ -49,6 +49,7 @@ def auto(epg_config, **kwargs):
     epg_config.set_values(**kwargs)
     click.echo(f"Downloading from {epg_config.epg_proto}://{epg_config.epg_host} to {epg_config.directory}")
     download_from_epg()
+    upload_to_s3()
     return 0
 
 

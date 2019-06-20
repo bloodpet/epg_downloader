@@ -1,6 +1,8 @@
 from environs import Env
-from peewee import Model, SqliteDatabase
+from playhouse.kv import KeyValue
+from playhouse.sqlite_ext import SqliteExtDatabase
 import os
+
 
 env = Env()
 env.read_env(os.environ.get('PWD'))
@@ -16,13 +18,21 @@ class settings:
         'AWS_S3_ENDPOINT_URL',
         'https://{}.digitaloceanspaces.com'.format(AWS_REGION_NAME),
     )
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_PREFIX = env('AWS_S3_PREFIX', default='')
     DIRECTORY = env('DIRECTORY', default=env('PWD'))
     DATABASE_PATH = env('DATABASE_PATH', default=f'{DIRECTORY}/epg_downloader.db')
 
 
-database = SqliteDatabase(settings.DATABASE_PATH)
+database = SqliteExtDatabase(
+    settings.DATABASE_PATH,
+    pragmas=(
+        ('cache_size', -1024 * 4),  # 4MB page-cache.
+        ('journal_mode', 'wal'),  # Use WAL-mode (you should always use this!).
+        ('foreign_keys', 1)  # Enforce foreign-key constraints.
+    )
+)
 
-
-class Recordings(Model):
-    class Meta:
-        database = database
+kv_store = KeyValue(database=database)

@@ -3,7 +3,7 @@ from urllib.parse import unquote_plus
 
 import requests
 
-from .app import settings
+from .app import kv_store, settings
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +42,20 @@ def get_epg_url(entry_id):
 
 def get_entries(data):
     for entry in data['recorded']:
+        entry_id = entry['id']
         filename = unquote_plus(entry['filename'])
         if not entry['recording']:
+            entry['epg_key'] = get_local_key(entry_id)
             entry['filename'] = filename
-            entry['epg_url'] = get_epg_url(entry['id']),
+            entry['epg_url'] = get_epg_url(entry_id),
             yield entry
         else:
             log.warn(f'Skipping {filename}')
+
+
+def get_local_key(entry_id):
+    return f'epgd_{entry_id}'
+
+
+def check_in_local_key(key):
+    return key in kv_store.keys()
