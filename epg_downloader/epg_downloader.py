@@ -42,7 +42,7 @@ def download_from_epg(**kwargs):
 
 def upload_to_s3(**kwargs):
     s3 = S3()
-    for entry in kv_store[kv_store.key.startswith('epg')]:
+    for entry in kv_store[kv_store.key.startswith('epgd')]:
         epg_key = get_local_key(entry['id'])
         filename = entry['filename']
         if entry['epg_status'] != 'downloaded':
@@ -59,6 +59,22 @@ def upload_to_s3(**kwargs):
             kv_store[epg_key] = entry
         entry['epg_status'] = 'uploaded'
         kv_store[epg_key] = entry
+
+
+def list_entries(status='all', **kwargs):
+    for entry in kv_store[kv_store.key.startswith('epgd')]:
+        if status != 'all' and entry['epg_status'] != status:
+            continue
+        yield {
+            'id': entry['id'],
+            'name': entry['name'],
+            'filename': entry['filename'],
+            'epg_status': entry['epg_status'],
+        }
+
+
+def list_downloaded(*, entry_id, key, **kwargs):
+    pass
 
 
 def initialize(path):

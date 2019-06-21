@@ -2,10 +2,12 @@
 
 """Console script for epg_downloader."""
 import sys
+
 import click
+from tabulate import tabulate
 
 from .app import settings
-from .epg_downloader import download_from_epg, upload_to_s3
+from .epg_downloader import download_from_epg, list_entries, upload_to_s3
 
 
 class EPGConfig(object):
@@ -75,9 +77,17 @@ def init(database):
     return 0
 
 
+@click.command()
+@click.option('--status', '-s', default='all', help="Filter the list based on status (all, downloading, downloaded, uploading, uploaded)")
+def ls(status):
+    """List all downloads/uploads"""
+    click.echo(tabulate(list_entries(status), headers='keys'))
+    return 0
+
+
 main.add_command(auto)
 main.add_command(download)
-main.add_command(auto)
+main.add_command(ls)
 
 
 if __name__ == "__main__":
