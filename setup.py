@@ -17,6 +17,7 @@ requirements = [
     'environs>=4.2',
     'peewee>=3.9',
     'requests>=2.22',
+    'tabulate>=0.8.3',
 ]
 
 setup_requirements = ['pytest-runner', ]
