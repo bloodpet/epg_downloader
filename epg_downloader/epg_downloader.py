@@ -61,6 +61,7 @@ def upload_all_to_s3(force=False, **kwargs):
         entry['s3_key'] = s3.get_key(filename)
         entry['s3_status'] = 'uploading'
         kv_store[db_key] = entry
+        log.info(f'Uploading {filename}')
         try:
             s3.upload(filename)
         except Exception:

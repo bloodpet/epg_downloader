@@ -1,5 +1,4 @@
 from datetime import datetime
-from dateutil.tz import tzutc
 import logging
 from urllib.parse import unquote_plus, quote
 
@@ -23,7 +22,7 @@ def download_file(url, filename):
 
 
 def get_datetime():
-    return datetime.now(tz=tzutc).isoformat()
+    return datetime.now().isoformat()
 
 
 def epg_request(url, method='GET', **kwargs):
