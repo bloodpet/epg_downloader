@@ -38,7 +38,7 @@ class S3(object):
 
     def upload_content(self, filename, content):
         remote_name = self.get_key(filename)
-        self.client.upload_file(
+        self.client.upload_fileobj(
             content,
             self.bucket,
             remote_name,

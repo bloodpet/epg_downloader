@@ -14,10 +14,12 @@ from .epg_downloader import (
     delete_local,
     download_all_from_epg,
     get_db_entry,
+    get_entries_to_upload,
     get_info,
     list_entries,
     migrate_data,
     upload_all_to_s3,
+    upload_to_s3,
 )
 
 
@@ -83,10 +85,14 @@ def download(epg_config, **kwargs):
 
 
 @click.command()
-def upload():
+@click.option('--test', '-t', is_flag=True, default=True, help="Just show files to upload")
+def upload(test):
     """Upload all non-uploaded items to S3"""
     click.echo(f"Uploading to S3")
-    upload_all_to_s3()
+    for entry in get_entries_to_upload():
+        click.echo(f"Uploading {entry['id']} {entry['filename']}")
+        if not test:
+            upload_to_s3(entry)
     return 0
 
 
