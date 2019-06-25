@@ -24,7 +24,7 @@ from .utils import (
 log = logging.getLogger(__name__)
 
 
-def download_all_from_epg(**kwargs):
+def get_entries_to_download():
     url = get_epg_list_url()
     response = epg_retrieve(url)
     for entry in get_epg_entries(response.json()):
@@ -35,6 +35,14 @@ def download_all_from_epg(**kwargs):
         if db_key in kv_store.keys():
             log.info(f"Skipping download of {filename}")
             continue
+        yield entry
+
+
+def download_all_from_epg(**kwargs):
+    for entry in get_entries_to_download():
+        db_key = entry['db_key']
+        filename = entry["filename"]
+        json_filename = f"{filename}.json"
         entry["epg_status"] = "downloading"
         kv_store[db_key] = entry
         try:
@@ -59,7 +67,7 @@ def get_entries_to_upload(force=False):
         if entry.get("local_status") == "deleted":
             log.info('Skip upload of {filename}. Local file deleted')
             continue
-        if not force or entry.get("s3_status") == "uploaded":
+        if not force and entry.get("s3_status") == "uploaded":
             log.info(f"Skipping upload of {filename}. Already uploaded")
             continue
         yield entry
