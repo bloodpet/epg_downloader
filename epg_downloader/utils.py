@@ -1,7 +1,7 @@
 from datetime import datetime
 from dateutil.tz import tzutc
 import logging
-from urllib.parse import unquote_plus, quote_plus
+from urllib.parse import unquote_plus, quote
 
 import requests
 
@@ -68,7 +68,7 @@ def get_entries(data):
 
 
 def get_s3_origin_url(entry):
-    return f"{settings.AWS_S3_ENDPOINT_URL}/{quote_plus(entry['s3_key'])}"
+    return f"{settings.AWS_S3_ENDPOINT_URL}/{quote(entry['s3_key'])}"
 
 
 def get_local_key(entry_id):

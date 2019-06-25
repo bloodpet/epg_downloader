@@ -14,16 +14,16 @@ class settings:
     EPG_HOST = env('EPG_HOST')
     EPG_PROTOCOL = env('EPG_PROTOCOL', default='http')
     AWS_REGION_NAME = env('AWS_REGION_NAME')
-    AWS_S3_ENDPOINT_URL = env(
-        'AWS_S3_ENDPOINT_URL',
-        'https://{}.digitaloceanspaces.com'.format(AWS_REGION_NAME),
-    )
     AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_PREFIX = env('AWS_S3_PREFIX', default='')
     DIRECTORY = env('DIRECTORY', default=env('PWD'))
     DATABASE_PATH = env('DATABASE_PATH', default=f'{DIRECTORY}/epg_downloader.db')
+    AWS_S3_ENDPOINT_URL = env(
+        'AWS_S3_ENDPOINT_URL',
+        'https://{}.{}.digitaloceanspaces.com'.format(AWS_STORAGE_BUCKET_NAME, AWS_REGION_NAME),
+    )
 
 
 database = SqliteExtDatabase(
