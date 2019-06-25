@@ -110,38 +110,39 @@ def migrate():
 
 
 @click.command()
-@click.argument('entry_id')
+@click.argument('entry_ids', nargs=-1)
 @click.option('--force', '-f', default=False, is_flag=True, help="Force delete regardless of status")
 @click.option('--epg', '--epgstation', '-e', default=False, is_flag=True, help="Delete on EPGStation")
 @click.option('--s3', '--spaces', '-s', default=False, is_flag=True, help="Delete on AWS S3 / DO Spaces")
-def delete(entry_id, force, epg, s3):
-    db_key = get_db_key(entry_id)
-    entry = kv_store[db_key]
-    filename = entry['filename']
-    if force:
-        confirm = True
-    else:
-        confirm = click.confirm(f"Do you really want to delete {filename} locally?")
-    if confirm:
-        click.echo(f"Deleting {filename}")
-        delete_local(entry=entry)
-    if epg and (force or entry['epg_status'] == 'downloaded'):
+def delete(entry_ids, force, epg, s3):
+    for entry_id in entry_ids:
+        db_key = get_db_key(entry_id)
+        entry = kv_store[db_key]
+        filename = entry['filename']
         if force:
             confirm = True
         else:
-            confirm = click.confirm('Do you really want to delete from EPGStation?')
+            confirm = click.confirm(f"Do you really want to delete {filename} locally?")
         if confirm:
-            click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
-            delete_from_epg()
-    if s3 and (force or entry['s3_status'] == 'uploaded'):
-        if force:
-            confirm = True
-        else:
-            confirm = click.confirm('Do you really want to delete from S3 / Spaces?')
-        if confirm:
-            click.echo(f"Deleting {entry['id']} {filename} from S3 / Spaces")
-            delete_from_s3()
-    kv_store[db_key] = entry
+            click.echo(f"Deleting {filename}")
+            delete_local(entry=entry)
+        if epg and (force or entry['epg_status'] == 'downloaded'):
+            if force:
+                confirm = True
+            else:
+                confirm = click.confirm('Do you really want to delete from EPGStation?')
+            if confirm:
+                click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
+                delete_from_epg()
+        if s3 and (force or entry['s3_status'] == 'uploaded'):
+            if force:
+                confirm = True
+            else:
+                confirm = click.confirm('Do you really want to delete from S3 / Spaces?')
+            if confirm:
+                click.echo(f"Deleting {entry['id']} {filename} from S3 / Spaces")
+                delete_from_s3()
+        kv_store[db_key] = entry
 
 
 main.add_command(auto)
