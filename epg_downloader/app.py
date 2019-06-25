@@ -24,6 +24,10 @@ class settings:
         'AWS_S3_ENDPOINT_URL',
         'https://{}.{}.digitaloceanspaces.com'.format(AWS_STORAGE_BUCKET_NAME, AWS_REGION_NAME),
     )
+    CDN_ENDPOINT_URL = env(
+        'AWS_S3_ENDPOINT_URL',
+        'https://{}.{}.cdn.digitaloceanspaces.com'.format(AWS_STORAGE_BUCKET_NAME, AWS_REGION_NAME),
+    )
 
 
 database = SqliteExtDatabase(

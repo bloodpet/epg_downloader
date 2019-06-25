@@ -71,6 +71,10 @@ def get_s3_origin_url(entry):
     return f"{settings.AWS_S3_ENDPOINT_URL}/{quote(entry['s3_key'])}"
 
 
+def get_cdn_url(entry):
+    return f"{settings.CDN_ENDPOINT_URL}/{quote(entry['s3_key'])}"
+
+
 def get_local_key(entry_id):
     return f'epgd_{entry_id}'
 

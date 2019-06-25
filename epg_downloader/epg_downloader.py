@@ -4,6 +4,7 @@ import logging
 from .app import kv_store
 from .clients import S3
 from .utils import (
+    get_cdn_url,
     get_datetime,
     get_entries,
     get_list_url,
@@ -82,7 +83,8 @@ def get_info(identifier):
     except ValueError:
         key = identifier
     entry = kv_store[key]
-    entry['s3_url'] = get_s3_origin_url(entry)
+    entry['web_origin_url'] = get_s3_origin_url(entry)
+    entry['web_cdn_url'] = get_cdn_url(entry)
     return entry
 
 
