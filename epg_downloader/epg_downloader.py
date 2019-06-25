@@ -53,11 +53,14 @@ def download_all_from_epg(**kwargs):
 def get_entries_to_upload(force=False):
     for entry in get_db_entries():
         filename = entry["filename"]
-        if (
-            entry["epg_status"] != "downloaded"
-            or entry.get("local_status") == "deleted"
-        ) and not (force or entry.get("s3_status") == "uploaded"):
-            log.info(f"Skipping upload of {filename}")
+        if entry["epg_status"] != "downloaded":
+            log.info('Skip upload of {filename}. Already downloaded')
+            continue
+        if entry.get("local_status") == "deleted":
+            log.info('Skip upload of {filename}. Local file deleted')
+            continue
+        if not force or entry.get("s3_status") == "uploaded":
+            log.info(f"Skipping upload of {filename}. Already uploaded")
             continue
         yield entry
 
