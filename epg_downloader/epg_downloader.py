@@ -157,5 +157,5 @@ def delete_from_s3(*, entry=None, entry_id=None, force=False):
     s3 = S3()
     if force or entry['s3_status'] != 'uploaded':
         s3.delete(entry['s3_key'])
-    entry['epg_status'] = 'deleted'
+    entry['s3_status'] = 'deleted'
     kv_store[db_key] = entry
