@@ -106,16 +106,20 @@ def get_info(identifier):
 def migrate_data():
     for entry in get_db_entries():
         entry_id = entry['id']
+        keys = entry.keys()
         if entry['epg_status'] == 'uploaded':
             entry['epg_status'] = 'downloaded'
             entry['s3_status'] = 'uploaded'
-        if 'web_origin_url' not in entry.keys():
+        if 'web_origin_url' not in keys:
             entry['web_origin_url'] = get_s3_origin_url(entry)
-        if 'web_cdn_url' not in entry.keys():
+        if 'web_cdn_url' not in keys:
             entry['web_cdn_url'] = get_cdn_url(entry)
-        entry['epg_file_url'] = get_epg_file_url(entry_id)
-        entry['epg_index_url'] = get_epg_index_url(entry_id)
-        entry['db_key'] = entry['epg_key']
+        if 'epg_file_url' not in keys:
+            entry['epg_file_url'] = get_epg_file_url(entry_id)
+        if 'epg_index_url' not in keys:
+            entry['epg_index_url'] = get_epg_index_url(entry_id)
+        if 'db_key' not in keys:
+            entry['db_key'] = entry['epg_key']
         kv_store[entry['epg_key']] = entry
 
 
