@@ -74,17 +74,24 @@ def upload_to_s3(force=False, **kwargs):
         kv_store[db_key] = entry
 
 
-def list_entries(status='all', **kwargs):
+def list_entries(status='all', fields=None, show_status=True, **kwargs):
+    if fields is None:
+        fields = ['name']
     for entry in get_db_entries(sort=True):
         if status != 'all' and entry['epg_status'] != status:
             continue
-        yield {
+        shown_entry = {
             'id': entry['id'],
-            'name': entry['name'],
-            'epg': entry['epg_status'],
-            's3': entry.get('s3_status', '-'),
-            'local': entry.get('local_status', '-'),
         }
+        if show_status:
+            shown_entry.update({
+                'epg': entry['epg_status'],
+                's3': entry.get('s3_status', '-'),
+                'local': entry.get('local_status', '-'),
+            })
+        for field in fields:
+            shown_entry[field] = entry[field]
+        yield shown_entry
 
 
 def get_info(identifier):

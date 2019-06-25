@@ -90,9 +90,11 @@ def init(database):
 
 @click.command()
 @click.option('--status', '-s', default='all', help="Filter the list based on status (all, downloading, downloaded, uploading, uploaded)")
-def ls(status):
+@click.option('--fields', '--field', '-f', multiple=True, default=['name'], help="Show given fields")
+@click.option('--show-status/--hide-status', '-ss/-hs', is_flag=True, default=True, help="Show/Hide status")
+def ls(status, fields, show_status):
     """List all downloads/uploads"""
-    click.echo(tabulate(list_entries(status), headers='keys'))
+    click.echo(tabulate(list_entries(status, fields, show_status), headers='keys'))
     return 0
 
 
