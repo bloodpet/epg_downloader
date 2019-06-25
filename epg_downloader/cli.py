@@ -7,13 +7,13 @@ import sys
 import click
 from tabulate import tabulate
 
-from .app import kv_store, settings
+from .app import settings
 from .epg_downloader import (
     delete_from_epg,
     delete_from_s3,
     delete_local,
     download_from_epg,
-    get_db_key,
+    get_db_entry,
     get_info,
     list_entries,
     migrate_data,
@@ -116,8 +116,7 @@ def migrate():
 @click.option('--s3', '--spaces', '-s', default=False, is_flag=True, help="Delete on AWS S3 / DO Spaces")
 def delete(entry_ids, force, epg, s3):
     for entry_id in entry_ids:
-        db_key = get_db_key(entry_id)
-        entry = kv_store[db_key]
+        entry = get_db_entry(entry_id)
         filename = entry['filename']
         if force:
             confirm = True
@@ -133,7 +132,7 @@ def delete(entry_ids, force, epg, s3):
                 confirm = click.confirm(f'Do you really want to delete {filename} from EPGStation?')
             if confirm:
                 click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
-                delete_from_epg()
+                delete_from_epg(entry=entry)
         if s3 and (force or entry['s3_status'] == 'uploaded'):
             if force:
                 confirm = True
@@ -141,8 +140,7 @@ def delete(entry_ids, force, epg, s3):
                 confirm = click.confirm(f'Do you really want to delete {filename} from S3 / Spaces?')
             if confirm:
                 click.echo(f"Deleting {entry['id']} {filename} from S3 / Spaces")
-                delete_from_s3()
-        kv_store[db_key] = entry
+                delete_from_s3(entry=entry)
 
 
 main.add_command(auto)
