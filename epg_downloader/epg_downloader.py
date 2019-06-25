@@ -24,7 +24,7 @@ from .utils import (
 log = logging.getLogger(__name__)
 
 
-def download_from_epg(**kwargs):
+def download_all_from_epg(**kwargs):
     url = get_epg_list_url()
     response = epg_retrieve(url)
     for entry in get_epg_entries(response.json()):
@@ -50,7 +50,7 @@ def download_from_epg(**kwargs):
         kv_store[db_key] = entry
 
 
-def upload_to_s3(force=False, **kwargs):
+def upload_all_to_s3(force=False, **kwargs):
     s3 = S3()
     for entry in get_db_entries():
         db_key = get_db_key(entry['id'])

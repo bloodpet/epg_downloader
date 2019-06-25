@@ -12,12 +12,12 @@ from .epg_downloader import (
     delete_from_epg,
     delete_from_s3,
     delete_local,
-    download_from_epg,
+    download_all_from_epg,
     get_db_entry,
     get_info,
     list_entries,
     migrate_data,
-    upload_to_s3,
+    upload_all_to_s3,
 )
 
 
@@ -61,8 +61,9 @@ def auto(epg_config, **kwargs):
     """Download from EPGStation & Upload to S3"""
     epg_config.set_values(**kwargs)
     click.echo(f"Downloading from {epg_config.epg_proto}://{epg_config.epg_host} to {epg_config.directory}")
-    download_from_epg()
-    upload_to_s3()
+    download_all_from_epg()
+    click.echo(f"Uploading to S3")
+    upload_all_to_s3()
     return 0
 
 
@@ -77,7 +78,15 @@ def download(epg_config, **kwargs):
     """Download from EPGStation to local directory"""
     epg_config.set_values(**kwargs)
     click.echo(f"Downloading from {epg_config.epg_proto}://{epg_config.epg_host} to {epg_config.directory}")
-    download_from_epg()
+    download_all_from_epg()
+    return 0
+
+
+@click.command()
+def upload():
+    """Upload all non-uploaded items to S3"""
+    click.echo(f"Uploading to S3")
+    upload_all_to_s3()
     return 0
 
 
@@ -147,11 +156,14 @@ def delete(entry_ids, force, epg, s3):
 
 main.add_command(auto)
 main.add_command(delete)
+main.add_command(delete, name='del')
+main.add_command(delete, name='rm')
 main.add_command(download)
 main.add_command(info)
 main.add_command(ls)
 main.add_command(ls, name='list')
 main.add_command(migrate)
+main.add_command(upload)
 
 
 if __name__ == "__main__":
