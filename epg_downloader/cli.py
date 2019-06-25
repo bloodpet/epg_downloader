@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 
 """Console script for epg_downloader."""
+from pprint import pformat
 import sys
 
 import click
 from tabulate import tabulate
 
 from .app import settings
-from .epg_downloader import download_from_epg, list_entries, upload_to_s3
+from .epg_downloader import (
+    download_from_epg,
+    get_info,
+    list_entries, upload_to_s3,
+)
 
 
 class EPGConfig(object):
@@ -85,8 +90,15 @@ def ls(status):
     return 0
 
 
+@click.command()
+@click.argument('entry_id')
+def info(entry_id):
+    click.echo(pformat(get_info(entry_id)))
+
+
 main.add_command(auto)
 main.add_command(download)
+main.add_command(info)
 main.add_command(ls)
 
 

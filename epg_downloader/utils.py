@@ -1,5 +1,7 @@
+from datetime import datetime
+from dateutil.tz import tzutc
 import logging
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, quote_plus
 
 import requests
 
@@ -18,6 +20,10 @@ def download_file(url, filename):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
     return filename
+
+
+def get_datetime():
+    return datetime.now(tz=tzutc).isoformat()
 
 
 def retrieve(url, **kwargs):
@@ -40,6 +46,14 @@ def get_epg_url(entry_id):
     )
 
 
+def get_epg_info_url(entry_id):
+    return '{}://{}/api/recorded/{}/'.format(
+        settings.EPG_PROTOCOL,
+        settings.EPG_HOST,
+        entry_id,
+    )
+
+
 def get_entries(data):
     for entry in data['recorded']:
         entry_id = entry['id']
@@ -51,6 +65,10 @@ def get_entries(data):
             yield entry
         else:
             log.warn(f'Skipping {filename}')
+
+
+def get_s3_origin_url(entry):
+    return f"{settings.AWS_S3_ENDPOINT_URL}/{quote_plus(entry['s3_key'])}"
 
 
 def get_local_key(entry_id):

@@ -4,9 +4,11 @@ import logging
 from .app import kv_store
 from .clients import S3
 from .utils import (
+    get_datetime,
     get_entries,
     get_list_url,
     get_local_key,
+    get_s3_origin_url,
     retrieve,
     download_file,
 )
@@ -37,6 +39,7 @@ def download_from_epg(**kwargs):
         with open(json_filename, 'w') as fp:
             json.dump(entry, fp, indent=True, ensure_ascii=False)
         entry['epg_status'] = 'downloaded'
+        entry['downloaded_on'] = get_datetime()
         kv_store[epg_key] = entry
 
 
@@ -58,6 +61,7 @@ def upload_to_s3(**kwargs):
             entry['epg_status'] = 'uploading_error'
             kv_store[epg_key] = entry
         entry['epg_status'] = 'uploaded'
+        entry['uploaded_on'] = get_datetime()
         kv_store[epg_key] = entry
 
 
@@ -67,10 +71,19 @@ def list_entries(status='all', **kwargs):
             continue
         yield {
             'id': entry['id'],
-            'name': entry['name'],
             'filename': entry['filename'],
             'epg_status': entry['epg_status'],
         }
+
+
+def get_info(identifier):
+    try:
+        key = get_local_key(int(identifier))
+    except ValueError:
+        key = identifier
+    entry = kv_store[key]
+    entry['s3_url'] = get_s3_origin_url(entry)
+    return entry
 
 
 def list_downloaded(*, entry_id, key, **kwargs):
