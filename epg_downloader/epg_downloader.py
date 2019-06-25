@@ -80,8 +80,10 @@ def list_entries(status='all', **kwargs):
             continue
         yield {
             'id': entry['id'],
-            'filename': entry['filename'],
-            'epg_status': entry['epg_status'],
+            'name': entry['name'],
+            'epg': entry['epg_status'],
+            's3': entry.get('s3_status', '-'),
+            'local': entry.get('local_status', '-'),
         }
 
 
