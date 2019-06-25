@@ -110,7 +110,7 @@ def migrate_data():
         if entry['epg_status'] == 'uploaded':
             entry['epg_status'] = 'downloaded'
             entry['s3_status'] = 'uploaded'
-        if entry['s3_status'] == 'uploaded':
+        if entry.get('s3_status') == 'uploaded':
             if 'web_origin_url' not in keys:
                 entry['web_origin_url'] = get_s3_origin_url(entry)
             if 'web_cdn_url' not in keys:
