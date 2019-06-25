@@ -92,8 +92,12 @@ def get_db_key(entry_id):
     return f'{settings.KEY_PREFIX}_{entry_id}'
 
 
-def get_db_entries():
-    return kv_store[kv_store.key.startswith(settings.KEY_PREFIX)]
+def get_db_entries(sort=False):
+    if not sort:
+        return kv_store[kv_store.key.startswith(settings.KEY_PREFIX)]
+    for key in sorted(list(kv_store.keys())):
+        if key.startswith(settings.KEY_PREFIX):
+            yield kv_store[key]
 
 
 def check_in_local_key(key):

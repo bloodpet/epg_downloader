@@ -8,14 +8,14 @@ from .utils import (
     epg_request,
     epg_retrieve,
     get_cdn_url,
-    get_db_entry,
     get_datetime,
+    get_db_entries,
+    get_db_entry,
+    get_db_key,
     get_epg_entries,
     get_epg_file_url,
     get_epg_index_url,
     get_epg_list_url,
-    get_db_entries,
-    get_db_key,
     get_s3_origin_url,
     download_file,
 )
@@ -75,7 +75,7 @@ def upload_to_s3(force=False, **kwargs):
 
 
 def list_entries(status='all', **kwargs):
-    for entry in get_db_entries():
+    for entry in get_db_entries(sort=True):
         if status != 'all' and entry['epg_status'] != status:
             continue
         yield {
