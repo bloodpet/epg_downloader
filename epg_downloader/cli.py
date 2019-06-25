@@ -85,7 +85,7 @@ def download(epg_config, **kwargs):
 
 
 @click.command()
-@click.option('--test', '-t', is_flag=True, default=True, help="Just show files to upload")
+@click.option('--test', '-t', is_flag=True, default=False, help="Just show files to upload")
 def upload(test):
     """Upload all non-uploaded items to S3"""
     click.echo(f"Uploading to S3")
