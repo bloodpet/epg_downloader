@@ -28,6 +28,7 @@ class settings:
         'AWS_S3_ENDPOINT_URL',
         'https://{}.{}.cdn.digitaloceanspaces.com'.format(AWS_STORAGE_BUCKET_NAME, AWS_REGION_NAME),
     )
+    KEY_PREFIX = 'epgd'
 
 
 database = SqliteExtDatabase(

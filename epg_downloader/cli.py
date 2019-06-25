@@ -7,11 +7,17 @@ import sys
 import click
 from tabulate import tabulate
 
-from .app import settings
+from .app import kv_store, settings
 from .epg_downloader import (
+    delete_from_epg,
+    delete_from_s3,
+    delete_local,
     download_from_epg,
+    get_db_key,
     get_info,
-    list_entries, upload_to_s3,
+    list_entries,
+    migrate_data,
+    upload_to_s3,
 )
 
 
@@ -96,10 +102,55 @@ def info(entry_id):
     click.echo(pformat(get_info(entry_id)))
 
 
+@click.command()
+def migrate():
+    click.echo('Migrating data')
+    migrate_data()
+    click.echo('Done')
+
+
+@click.command()
+@click.argument('entry_id')
+@click.option('--force', '-f', default=False, is_flag=True, help="Force delete regardless of status")
+@click.option('--epg', '--epgstation', '-e', default=False, is_flag=True, help="Delete on EPGStation")
+@click.option('--s3', '--spaces', '-s', default=False, is_flag=True, help="Delete on AWS S3 / DO Spaces")
+def delete(entry_id, force, epg, s3):
+    db_key = get_db_key(entry_id)
+    entry = kv_store[db_key]
+    filename = entry['filename']
+    if force:
+        confirm = True
+    else:
+        confirm = click.confirm(f"Do you really want to delete {filename} locally?")
+    if confirm:
+        click.echo(f"Deleting {filename}")
+        delete_local(entry=entry)
+    if epg and (force or entry['epg_status'] == 'downloaded'):
+        if force:
+            confirm = True
+        else:
+            confirm = click.confirm('Do you really want to delete from EPGStation?')
+        if confirm:
+            click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
+            delete_from_epg()
+    if s3 and (force or entry['s3_status'] == 'uploaded'):
+        if force:
+            confirm = True
+        else:
+            confirm = click.confirm('Do you really want to delete from S3 / Spaces?')
+        if confirm:
+            click.echo(f"Deleting {entry['id']} {filename} from S3 / Spaces")
+            delete_from_s3()
+    kv_store[db_key] = entry
+
+
 main.add_command(auto)
+main.add_command(delete)
 main.add_command(download)
 main.add_command(info)
 main.add_command(ls)
+main.add_command(ls, name='list')
+main.add_command(migrate)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 def download_file(url, filename):
     # got from https://stackoverflow.com/a/16696317
     log.info(f'Downloading {filename}')
-    with retrieve(url, stream=True) as r:
+    with epg_retrieve(url, stream=True) as r:
         r.raise_for_status()
         with open(filename, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
@@ -26,19 +26,31 @@ def get_datetime():
     return datetime.now(tz=tzutc).isoformat()
 
 
-def retrieve(url, **kwargs):
+def epg_request(url, method='GET', **kwargs):
     kwargs['auth'] = requests.auth.HTTPBasicAuth(settings.EPG_USER, settings.EPG_PASSWORD)
-    return requests.get(url, **kwargs)
+    return requests.request(method, url, **kwargs)
 
 
-def get_list_url():
+def epg_retrieve(url, **kwargs):
+    return epg_request(url, **kwargs)
+
+
+def get_epg_list_url():
     return '{}://{}/api/recorded/'.format(
         settings.EPG_PROTOCOL,
         settings.EPG_HOST,
     )
 
 
-def get_epg_url(entry_id):
+def get_epg_file_url(entry_id):
+    return '{}://{}/api/recorded/{}/file'.format(
+        settings.EPG_PROTOCOL,
+        settings.EPG_HOST,
+        entry_id,
+    )
+
+
+def get_epg_index_url(entry_id):
     return '{}://{}/api/recorded/{}/file'.format(
         settings.EPG_PROTOCOL,
         settings.EPG_HOST,
@@ -54,14 +66,15 @@ def get_epg_info_url(entry_id):
     )
 
 
-def get_entries(data):
+def get_epg_entries(data):
     for entry in data['recorded']:
         entry_id = entry['id']
         filename = unquote_plus(entry['filename'])
         if not entry['recording']:
-            entry['epg_key'] = get_local_key(entry_id)
+            entry['db_key'] = get_db_key(entry_id)
             entry['filename'] = filename
-            entry['epg_url'] = get_epg_url(entry_id)
+            entry['epg_file_url'] = get_epg_file_url(entry_id)
+            entry['epg_index_url'] = get_epg_index_url(entry_id)
             yield entry
         else:
             log.warn(f'Skipping {filename}')
@@ -75,8 +88,12 @@ def get_cdn_url(entry):
     return f"{settings.CDN_ENDPOINT_URL}/{quote(entry['s3_key'])}"
 
 
-def get_local_key(entry_id):
-    return f'epgd_{entry_id}'
+def get_db_key(entry_id):
+    return f'{settings.KEY_PREFIX}_{entry_id}'
+
+
+def get_db_entries():
+    return kv_store[kv_store.key.startswith(settings.KEY_PREFIX)]
 
 
 def check_in_local_key(key):
