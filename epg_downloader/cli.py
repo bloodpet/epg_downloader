@@ -130,7 +130,7 @@ def delete(entry_ids, force, epg, s3):
             if force:
                 confirm = True
             else:
-                confirm = click.confirm('Do you really want to delete from EPGStation?')
+                confirm = click.confirm(f'Do you really want to delete {filename} from EPGStation?')
             if confirm:
                 click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
                 delete_from_epg()
@@ -138,7 +138,7 @@ def delete(entry_ids, force, epg, s3):
             if force:
                 confirm = True
             else:
-                confirm = click.confirm('Do you really want to delete from S3 / Spaces?')
+                confirm = click.confirm(f'Do you really want to delete {filename} from S3 / Spaces?')
             if confirm:
                 click.echo(f"Deleting {entry['id']} {filename} from S3 / Spaces")
                 delete_from_s3()

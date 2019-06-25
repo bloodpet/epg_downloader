@@ -8,6 +8,7 @@ from .utils import (
     epg_request,
     epg_retrieve,
     get_cdn_url,
+    get_db_entry,
     get_datetime,
     get_epg_entries,
     get_epg_file_url,
@@ -125,9 +126,9 @@ def migrate_data():
 
 
 def delete_local(*, entry=None, entry_id=None):
-    db_key = get_db_key(entry_id)
     if entry is None:
-        entry = kv_store[db_key]
+        entry = get_db_entry(entry_id)
+    db_key = entry['db_key']
     if entry.get('local_status') != 'deleted':
         try:
             os.unlink(entry['filename'])
@@ -138,9 +139,9 @@ def delete_local(*, entry=None, entry_id=None):
 
 
 def delete_from_epg(*, entry=None, entry_id=None, force=False):
-    db_key = get_db_key(entry_id,)
     if entry is None:
-        entry = kv_store[db_key]
+        entry = get_db_entry(entry_id)
+    db_key = entry['db_key']
     if force or entry['epg_status'] != 'deleted':
         epg_request(entry['epg_index_url'], 'DELETE')
     entry['epg_status'] = 'deleted'
@@ -148,10 +149,10 @@ def delete_from_epg(*, entry=None, entry_id=None, force=False):
 
 
 def delete_from_s3(*, entry=None, entry_id=None, force=False):
-    db_key = get_db_key(entry_id)
-    s3 = S3()
     if entry is None:
-        entry = kv_store[db_key]
+        entry = get_db_entry(entry_id)
+    db_key = entry['db_key']
+    s3 = S3()
     if force or entry['s3_status'] != 'uploaded':
         s3.delete(entry['s3_key'])
     entry['epg_status'] = 'deleted'

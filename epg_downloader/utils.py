@@ -98,3 +98,7 @@ def get_db_entries():
 
 def check_in_local_key(key):
     return key in kv_store.keys()
+
+
+def get_db_entry(entry_id):
+    return kv_store[get_db_key(entry_id)]
