@@ -95,9 +95,10 @@ def get_db_entries(sort=False):
     if not sort:
         for entry in kv_store[kv_store.key.startswith(settings.KEY_PREFIX)]:
             yield entry
-    for key in sorted(list(kv_store.keys())):
-        if key.startswith(settings.KEY_PREFIX):
-            yield kv_store[key]
+    else:
+        for key in sorted(list(kv_store.keys())):
+            if key.startswith(settings.KEY_PREFIX):
+                yield kv_store[key]
 
 
 def check_in_local_key(key):
