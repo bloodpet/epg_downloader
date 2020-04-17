@@ -5,6 +5,8 @@ import os
 from .app import kv_store
 from .clients import S3
 from .utils import (
+    check_crc,
+    check_etag,
     epg_request,
     epg_retrieve,
     get_cdn_url,
@@ -15,13 +17,40 @@ from .utils import (
     get_epg_entries,
     get_epg_file_url,
     get_epg_index_url,
+    get_epg_info_url,
     get_epg_list_url,
+    get_epg_free,
     get_s3_origin_url,
     download_file,
 )
 
 
 log = logging.getLogger(__name__)
+
+
+def check_dl(identifier):
+    entry = get_entry(identifier)
+    print(entry['filename'], entry["id"])
+    is_valid = check_crc(entry['filename'], entry["id"])
+    if is_valid:
+        entry["epg_status"] = "downloaded"
+        entry["local_status"] = "downloaded"
+    else:
+        entry["epg_status"] = "downloading_error"
+    kv_store[entry["db_key"]] = entry
+    return is_valid
+
+
+def check_ul(identifier):
+    entry = get_entry(identifier)
+    is_valid = check_etag(entry['filename'], entry["web_origin_url"])
+    if is_valid:
+        entry["s3_status"] = "uploaded"
+        entry["local_status"] = "uploaded"
+    else:
+        entry["s3_status"] = "upload_error"
+    kv_store[entry["db_key"]] = entry
+    return is_valid
 
 
 def get_entries_to_download():
@@ -38,30 +67,56 @@ def get_entries_to_download():
         yield entry
 
 
-def download_all_from_epg(**kwargs):
+def update_from_epg(**kwargs):
     for entry in get_entries_to_download():
         db_key = entry['db_key']
-        filename = entry["filename"]
-        json_filename = f"{filename}.json"
-        entry["epg_status"] = "downloading"
+        entry["epg_status"] = "-"
         kv_store[db_key] = entry
-        try:
-            download_file(entry["epg_file_url"], filename)
-        except Exception:
-            log.error(f"Failed to download {db_key}: {filename}", exc_info=True)
-            entry["epg_status"] = "downloading_error"
-            kv_store[db_key] = entry
-        with open(json_filename, "w") as fp:
-            json.dump(entry, fp, indent=True, ensure_ascii=False)
-        entry["epg_status"] = "downloaded"
-        entry["downloaded_on"] = get_datetime()
+
+
+def download_all_from_epg(**kwargs):
+    for entry in get_entries_to_download():
+        download_from_epg(entry)
+
+
+def download_from_epg(entry, **kwargs):
+    db_key = entry['db_key']
+    filename = entry["filename"]
+    json_filename = f"{filename}.json"
+    entry["epg_status"] = "downloading"
+    kv_store[db_key] = entry
+    try:
+        download_file(entry["epg_file_url"], filename)
+    except Exception:
+        log.error(f"Failed to download {db_key}: {filename}", exc_info=True)
+        entry["epg_status"] = "downloading_error"
         kv_store[db_key] = entry
+    if os.path.getsize(filename) != entry["filesize"]:
+        entry["epg_status"] = "downloading_error"
+        kv_store[db_key] = entry
+    if not check_crc(filename, entry["id"]):
+        entry["epg_status"] = "downloading_error"
+        kv_store[db_key] = entry
+    with open(json_filename, "w") as fp:
+        json.dump(entry, fp, indent=True, ensure_ascii=False)
+    entry["epg_status"] = "downloaded"
+    entry["downloaded_on"] = get_datetime()
+    kv_store[db_key] = entry
+
+
+def download_one_from_epg(identifier):
+    try:
+        key = get_db_key(int(identifier))
+    except ValueError:
+        key = identifier
+    entry = kv_store[key]
+    return download_from_epg(entry)
 
 
 def get_entries_to_upload(force=False):
     for entry in get_db_entries():
         filename = entry["filename"]
-        if entry["epg_status"] != "downloaded":
+        if entry["epg_status"] != "downloaded" and entry.get("local_status") != "downloaded":
             log.info('Skip upload of {filename}. Already downloaded')
             continue
         if entry.get("local_status") == "deleted":
@@ -78,6 +133,11 @@ def upload_all_to_s3(force=False, **kwargs):
         upload_to_s3(entry)
 
 
+def upload_one(entry_id):
+    entry = get_entry(entry_id)
+    upload_to_s3(entry)
+
+
 def upload_to_s3(entry, force=False):
     s3 = S3()
     db_key = entry["db_key"]
@@ -90,13 +150,19 @@ def upload_to_s3(entry, force=False):
         s3.upload(filename)
     except Exception:
         log.error(f"Failed to upload {db_key}: {filename}", exc_info=True)
-        entry["s3_status"] = "uploading_error"
+        entry["s3_status"] = "upload_error"
+        kv_store[db_key] = entry
+        return
+
+    entry["web_origin_url"] = get_s3_origin_url(entry)
+    entry["web_cdn_url"] = get_cdn_url(entry)
+    if not check_etag(entry['filename'], entry["web_origin_url"]):
+        entry["s3_status"] = "upload_error"
         kv_store[db_key] = entry
         return
     entry["s3_status"] = "uploaded"
+    entry["local_status"] = "uploaded"
     entry["uploaded_on"] = get_datetime()
-    entry["web_origin_url"] = get_s3_origin_url(entry)
-    entry["web_cdn_url"] = get_cdn_url(entry)
     kv_store[db_key] = entry
 
 
@@ -116,26 +182,27 @@ def list_entries(status="all", fields=None, show_status=True, **kwargs):
                 }
             )
         for field in fields:
-            shown_entry[field] = entry[field]
+            if field == "size":
+                size = int(entry["filesize"]) / (1024 * 1024 * 1024)
+                shown_entry[field] = f"{size:.2f}"
+            else:
+                shown_entry[field] = entry.get(field, "-")
         yield shown_entry
 
 
 def get_info(identifier):
-    try:
-        key = get_db_key(int(identifier))
-    except ValueError:
-        key = identifier
-    entry = kv_store[key]
+    entry = get_entry(identifier)
     # Fix for version 0.3
     has_changed = False
-    if "web_origin_url" not in entry.keys():
-        entry["web_origin_url"] = get_s3_origin_url(entry)
-        has_changed = True
-    if "web_cdn_url" not in entry.keys():
-        entry["web_cdn_url"] = get_cdn_url(entry)
-        has_changed = True
+    if "s3_key" in entry:
+        if "web_origin_url" not in entry:
+            entry["web_origin_url"] = get_s3_origin_url(entry)
+            has_changed = True
+        if "web_cdn_url" not in entry:
+            entry["web_cdn_url"] = get_cdn_url(entry)
+            has_changed = True
     if has_changed:
-        kv_store[key] = entry
+        kv_store[entry["db_key"]] = entry
     return entry
 
 
@@ -145,8 +212,10 @@ def migrate_data():
         keys = entry.keys()
         if entry["epg_status"] == "uploaded":
             entry["epg_status"] = "downloaded"
+            entry["local_status"] = "uploaded"
             entry["s3_status"] = "uploaded"
         if entry.get("s3_status") == "uploaded":
+            entry["local_status"] = "uploaded"
             if "web_origin_url" not in keys:
                 entry["web_origin_url"] = get_s3_origin_url(entry)
             if "web_cdn_url" not in keys:
@@ -178,7 +247,9 @@ def delete_from_epg(*, entry=None, entry_id=None, force=False):
         entry = get_db_entry(entry_id)
     db_key = entry["db_key"]
     if force or entry["epg_status"] != "deleted":
-        epg_request(entry["epg_index_url"], "DELETE")
+        epg_request(get_epg_info_url(entry["id"]), "DELETE")
+    else:
+        print(f"Skipped {entry['id']}")
     entry["epg_status"] = "deleted"
     kv_store[db_key] = entry
 
@@ -192,3 +263,19 @@ def delete_from_s3(*, entry=None, entry_id=None, force=False):
         s3.delete(entry["s3_key"])
     entry["s3_status"] = "deleted"
     kv_store[db_key] = entry
+
+
+def get_entry(identifier):
+    try:
+        key = get_db_key(int(identifier))
+    except ValueError:
+        key = identifier
+    return kv_store[key]
+
+
+def get_free_space():
+    data = get_epg_free()
+    free_gb = data["free"] / (1024 * 1024 * 1024)
+    total_gb = data["total"] / (1024 * 1024 * 1024)
+    percent = 100 * free_gb / total_gb
+    return f"Free: {percent:.2f}%  {free_gb:.2f}/{total_gb:.2f} GB"

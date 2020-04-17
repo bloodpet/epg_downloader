@@ -9,16 +9,24 @@ from tabulate import tabulate
 
 from .app import settings
 from .epg_downloader import (
+    check_dl,
+    check_ul,
     delete_from_epg,
     delete_from_s3,
     delete_local,
     download_all_from_epg,
+    download_one_from_epg,
     get_db_entry,
+    get_entries_to_download,
     get_entries_to_upload,
+    get_entry,
+    get_free_space,
     get_info,
     list_entries,
     migrate_data,
+    update_from_epg,
     upload_all_to_s3,
+    upload_one,
     upload_to_s3,
 )
 
@@ -70,13 +78,37 @@ def auto(epg_config, **kwargs):
 
 
 @click.command()
+@click.argument('entry_ids', nargs=-1)
+@click.option('--dl', '--epg', '--epgstation', '-e', default=False, is_flag=True, help="Check download from EPGStation")
+@click.option('--ul', '--s3', '--spaces', '-s', default=False, is_flag=True, help="Check upload to AWS S3 / DO Spaces")
+def check(entry_ids, dl, ul):
+    if not dl and not ul:
+        dl = True
+    for entry_id in entry_ids:
+        if dl:
+            msg = "Good" if check_dl(entry_id) else "Bad"
+            click.echo(f"{entry_id} dl: {msg}")
+        if ul:
+            msg = "Good" if check_ul(entry_id) else "Bad"
+            click.echo(f"{entry_id} ul: {msg}")
+
+
+@click.command()
+@click.argument('entry_ids', nargs=-1)
+@pass_epg_config
+def download(epg_config, entry_ids, **kwargs):
+    for entry_id in entry_ids:
+        download_one_from_epg(entry_id)
+
+
+@click.command()
 @click.option('--epg-host', '-h', help="Host for EPGStation (example.com)")
 @click.option('--epg-user', '-u', help="Username for EPGStation")
 @click.option('--epg-proto', '-proto', help="Protocol for EPGStation (http/https)")
 @click.option('--epg-pass', '-p', help="Password for EPGStation")
 @click.option('--directory', '-d', help="Directory to download files")
 @pass_epg_config
-def download(epg_config, **kwargs):
+def download_all(epg_config, **kwargs):
     """Download from EPGStation to local directory"""
     epg_config.set_values(**kwargs)
     click.echo(f"Downloading from {epg_config.epg_proto}://{epg_config.epg_host} to {epg_config.directory}")
@@ -85,8 +117,31 @@ def download(epg_config, **kwargs):
 
 
 @click.command()
+@pass_epg_config
+def pending(epg_config):
+    """Get urls for download"""
+    update_from_epg()
+    for data in get_entries_to_download():
+        click.echo(data)
+
+
+@click.command()
 @click.option('--test', '-t', is_flag=True, default=False, help="Just show files to upload")
-def upload(test):
+@click.argument('entry_ids', nargs=-1)
+def upload(test, entry_ids):
+    """Upload all non-uploaded items to S3"""
+    click.echo(f"Uploading to S3")
+    for entry_id in entry_ids:
+        entry = get_entry(entry_id)
+        click.echo(f"Uploading {entry['id']} {entry['filename']}")
+        if not test:
+            upload_to_s3(entry)
+    return 0
+
+
+@click.command()
+@click.option('--test', '-t', is_flag=True, default=False, help="Just show files to upload")
+def upload_all(test):
     """Upload all non-uploaded items to S3"""
     click.echo(f"Uploading to S3")
     for entry in get_entries_to_upload():
@@ -114,9 +169,10 @@ def ls(status, fields, show_status):
 
 
 @click.command()
-@click.argument('entry_id')
-def info(entry_id):
-    click.echo(pformat(get_info(entry_id)))
+@click.argument('entry_ids', nargs=-1)
+def info(entry_ids):
+    for entry_id in entry_ids:
+        click.echo(pformat(get_info(entry_id)))
 
 
 @click.command()
@@ -149,7 +205,7 @@ def delete(entry_ids, force, epg, s3):
                 confirm = click.confirm(f'Do you really want to delete {filename} from EPGStation?')
             if confirm:
                 click.echo(f"Deleting {entry['id']} {filename} from EPGStation")
-                delete_from_epg(entry=entry)
+                delete_from_epg(entry=entry, force=force)
         if s3 and (force or entry['s3_status'] == 'uploaded'):
             if force:
                 confirm = True
@@ -160,16 +216,56 @@ def delete(entry_ids, force, epg, s3):
                 delete_from_s3(entry=entry)
 
 
+@click.command()
+def show_free():
+    click.echo(get_free_space())
+
+
+@click.command()
+@click.argument('entry_ids', nargs=-1)
+@click.option('--force', '-f', default=False, is_flag=True, help="Force delete regardless of status")
+def pipeline(entry_ids, force):
+    for entry_id in entry_ids:
+        click.echo(f"Downloading {entry_id}")
+        download_one_from_epg(entry_id)
+        click.echo(f"Download verified {entry_id}")
+        click.echo(f"Uploading {entry_id}")
+        upload_one(entry_id)
+        click.echo(f"Upload verified {entry_id}")
+        if force:
+            confirm = True
+        else:
+            confirm = click.confirm(f"Do you really want to delete {entry_id} locally?")
+        if confirm:
+            click.echo(f"Deleting {entry_id}")
+            delete_local(entry_id=entry_id)
+        if force:
+            confirm = True
+        else:
+            confirm = click.confirm(f'Do you really want to delete {entry_id} from EPGStation?')
+        if confirm:
+            click.echo(f"Deleting {entry_id} from EPGStation")
+            delete_from_epg(entry_id=entry_id)
+
+
 main.add_command(auto)
+main.add_command(check)
 main.add_command(delete)
 main.add_command(delete, name='del')
 main.add_command(delete, name='rm')
 main.add_command(download)
+main.add_command(download, name='dl')
+main.add_command(download_all)
+main.add_command(pending)
+main.add_command(pipeline)
 main.add_command(info)
 main.add_command(ls)
 main.add_command(ls, name='list')
 main.add_command(migrate)
 main.add_command(upload)
+main.add_command(upload_all)
+main.add_command(show_free)
+main.add_command(show_free, name="free")
 
 
 if __name__ == "__main__":
