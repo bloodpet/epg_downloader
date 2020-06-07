@@ -1,6 +1,8 @@
 import json
-import logging
+from logzero import logger as log
 import os
+from pathlib import Path
+from pymediainfo import MediaInfo
 
 from .app import kv_store
 from .clients import S3
@@ -24,13 +26,12 @@ from .utils import (
     download_file,
 )
 
-
-log = logging.getLogger(__name__)
+Path
 
 
 def check_dl(identifier):
     entry = get_entry(identifier)
-    print(entry['filename'], entry["id"])
+    log.info(entry['filename'], entry["id"])
     is_valid = check_crc(entry['filename'], entry["id"])
     if is_valid:
         entry["epg_status"] = "downloaded"
@@ -83,6 +84,7 @@ def download_from_epg(entry, **kwargs):
     db_key = entry['db_key']
     filename = entry["filename"]
     json_filename = f"{filename}.json"
+    log.info(f"Downloading {db_key}: {filename}")
     entry["epg_status"] = "downloading"
     kv_store[db_key] = entry
     try:
@@ -91,17 +93,23 @@ def download_from_epg(entry, **kwargs):
         log.error(f"Failed to download {db_key}: {filename}", exc_info=True)
         entry["epg_status"] = "downloading_error"
         kv_store[db_key] = entry
+        raise
     if os.path.getsize(filename) != entry["filesize"]:
         entry["epg_status"] = "downloading_error"
         kv_store[db_key] = entry
+        log.warn(f"Failed download: {db_key}: {filename}")
+        raise ValueError("filesize does not match")
     if not check_crc(filename, entry["id"]):
         entry["epg_status"] = "downloading_error"
         kv_store[db_key] = entry
+        log.warn(f"Failed download: {db_key}: {filename}")
+        raise ValueError("crc does not match")
     with open(json_filename, "w") as fp:
         json.dump(entry, fp, indent=True, ensure_ascii=False)
     entry["epg_status"] = "downloaded"
     entry["downloaded_on"] = get_datetime()
     kv_store[db_key] = entry
+    log.info(f"Success download: {db_key}: {filename}")
 
 
 def download_one_from_epg(identifier):
@@ -142,24 +150,43 @@ def upload_to_s3(entry, force=False):
     s3 = S3()
     db_key = entry["db_key"]
     filename = entry["filename"]
+    log.info(f"Uploading {db_key}: {filename} to S3")
     entry["s3_key"] = s3.get_key(filename)
     entry["s3_status"] = "uploading"
     kv_store[db_key] = entry
     log.info(f"Uploading {filename}")
+    json_file = f"{filename}.json"
+    log_file = f"{filename}.log"
+    mediainfo_file = f'{entry["filename"]}.mediainfo.json'
+    try:
+        s3.upload(json_file, {"ContentType": "application/json"})
+    except Exception:
+        pass
+    try:
+        s3.upload(log_file, {"ContentType": "text/plain; charset=utf-8"})
+    except Exception:
+        pass
+    try:
+        s3.upload(mediainfo_file, {"ContentType": "application/json"})
+    except Exception:
+        pass
     try:
         s3.upload(filename)
     except Exception:
         log.error(f"Failed to upload {db_key}: {filename}", exc_info=True)
         entry["s3_status"] = "upload_error"
         kv_store[db_key] = entry
-        return
+        raise
 
     entry["web_origin_url"] = get_s3_origin_url(entry)
     entry["web_cdn_url"] = get_cdn_url(entry)
     if not check_etag(entry['filename'], entry["web_origin_url"]):
+        log.error(f"Failed to upload {db_key}: {filename}", exc_info=True)
         entry["s3_status"] = "upload_error"
         kv_store[db_key] = entry
+        raise ValueError(f"{db_key}: E-Tag does not match.")
         return
+
     entry["s3_status"] = "uploaded"
     entry["local_status"] = "uploaded"
     entry["uploaded_on"] = get_datetime()
@@ -170,7 +197,7 @@ def list_entries(status="all", fields=None, show_status=True, **kwargs):
     if fields is None:
         fields = ["name"]
     for entry in get_db_entries(sort=True):
-        if status != "all" and entry["epg_status"] != status:
+        if status != "all" and entry.get("epg_status") != status and entry.get("s3_status") != status:
             continue
         shown_entry = {"id": entry["id"]}
         if show_status:
@@ -249,7 +276,7 @@ def delete_from_epg(*, entry=None, entry_id=None, force=False):
     if force or entry["epg_status"] != "deleted":
         epg_request(get_epg_info_url(entry["id"]), "DELETE")
     else:
-        print(f"Skipped {entry['id']}")
+        log.info(f"Skipped {entry['id']}")
     entry["epg_status"] = "deleted"
     kv_store[db_key] = entry
 
@@ -279,3 +306,93 @@ def get_free_space():
     total_gb = data["total"] / (1024 * 1024 * 1024)
     percent = 100 * free_gb / total_gb
     return f"Free: {percent:.2f}%  {free_gb:.2f}/{total_gb:.2f} GB"
+
+
+def gen_html():
+    fields = [
+        "filename",
+        "name",
+        "size",
+        "web_cdn_url",
+        "web_origin_url",
+    ]
+    content = '<html>\n<meta charset="utf-8">\n<ul>'
+    for entry in list_entries(status="uploaded", fields=fields):
+        mediainfo_file = "{filename}.mediainfo.json".format(**entry)
+        if Path(mediainfo_file).is_file():
+            content += """<li>
+                <a href="{web_cdn_url}">{name}</a>:&nbsp;
+                <a href="{web_cdn_url}.json">details</a>&nbsp;|&nbsp;
+                <a href="{web_cdn_url}.log">log/crc</a>&nbsp;|&nbsp;
+                <a href="{web_cdn_url}.mediainfo.json">MediaInfo</a>
+                Size: {size}GB,
+                Filename: {filename}
+            </li>
+            """.format(
+                **entry
+            )
+        else:
+            content += """<li>
+                <a href="{web_cdn_url}">{name}</a>:&nbsp;
+                <a href="{web_cdn_url}.json">details</a>&nbsp;|&nbsp;
+                <a href="{web_cdn_url}.log">log/crc</a>
+                Size: {size}GB,
+                Filename: {filename}
+            </li>
+            """.format(
+                **entry
+            )
+    content += "</ul>\n</html>"
+    log.debug("Uploading html")
+    with open("uploads.html", "w") as fp:
+        fp.write(content)
+    s3 = S3()
+    s3.upload("uploads.html", {"ContentType": "text/html"})
+    log.debug("Uploaded html")
+
+
+def create_mediainfo(entry=None, entry_id=None):
+    if entry is None:
+        entry = get_entry(entry_id)
+    filename = entry["filename"]
+    info = MediaInfo.parse(filename)
+    mediainfo_file = f"{filename}.mediainfo.json"
+    with open(mediainfo_file, "w") as fp:
+        fp.write(info.to_json())
+
+
+def upload_mediainfo(entry=None, entry_id=None):
+    s3 = S3()
+    if entry is None:
+        entry = get_entry(entry_id)
+    mediainfo_file = f'{entry["filename"]}.mediainfo.json'
+    try:
+        s3.upload(mediainfo_file, {"ContentType": "application/json"})
+    except Exception:
+        pass
+
+
+def epg_to_s3_all():
+    dl_cnt = 0
+    for entry in get_entries_to_download():
+        try:
+            epg_to_s3(entry)
+        except Exception:
+            log.error("Failed downloading or uploading", exc_info=True)
+            continue
+        dl_cnt += 1
+    if dl_cnt:
+        log.info(f"Downloaded {dl_cnt} files")
+        # Generate HTML
+        gen_html()
+
+
+def epg_to_s3(entry, force=True):
+    download_from_epg(entry)
+    try:
+        create_mediainfo(entry=entry)
+    except Exception:
+        log.error("Failed creating mediainfo", exc_info=True)
+    upload_to_s3(entry)
+    delete_local(entry=entry)
+    delete_from_epg(entry=entry, force=force)
