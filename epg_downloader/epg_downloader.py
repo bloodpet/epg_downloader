@@ -75,9 +75,15 @@ def update_from_epg(**kwargs):
         kv_store[db_key] = entry
 
 
-def download_all_from_epg(**kwargs):
+def download_all_from_epg(force=True, **kwargs):
     for entry in get_entries_to_download():
         download_from_epg(entry)
+        try:
+            create_mediainfo(entry=entry)
+        except Exception:
+            log.error("Failed creating mediainfo", exc_info=True)
+        else:
+            delete_from_epg(entry=entry, force=force)
 
 
 def download_from_epg(entry, **kwargs):
