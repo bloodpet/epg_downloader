@@ -15,6 +15,7 @@ requirements = [
     'Click>=6.0',
     'boto3>=1.9',
     'environs>=4.2',
+    'logzero>=1.5.0',
     'peewee>=3.9',
     'requests>=2.22',
     'tabulate>=0.8.3',
