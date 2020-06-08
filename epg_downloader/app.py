@@ -1,11 +1,10 @@
 from environs import Env
 from playhouse.kv import KeyValue
 from playhouse.sqlite_ext import SqliteExtDatabase
-import os
 
 
 env = Env()
-env.read_env(os.environ.get('PWD'))
+env.read_env(".env")
 
 
 class settings:
