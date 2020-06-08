@@ -4,4 +4,4 @@
 
 __author__ = """Emanuel Calso"""
 __email__ = 'epg@bloodpet.com'
-__version__ = '0.4.17'
+__version__ = '0.5.0'
