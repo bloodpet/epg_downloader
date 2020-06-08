@@ -17,6 +17,7 @@ requirements = [
     'environs>=4.2',
     'logzero>=1.5.0',
     'peewee>=3.9',
+    'pymediainfo>=4.2.1',
     'requests>=2.22',
     'tabulate>=0.8.3',
 ]
